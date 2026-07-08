@@ -1,0 +1,834 @@
+<title>EDDI-FPGA — Code Walkthrough</title>
+<style>
+/* ---------------------------------------------------------- tokens */
+:root{
+  --bg:#0B1220; --panel:#101A2E; --panel2:#0D1626;
+  --ink:#E8EEF7; --muted:#93A2B8; --line:#22314B;
+  --plasma:#46D6A8; --plasma-dim:#2B8A6C;
+  --impact:#F0A45B; --impact-dim:#A96B33;
+  --code-bg:#0D1626; --code-ink:#D9E3F0; --code-comment:#647894;
+  --code-kw:#7FB4E8; --code-num:#E8C57F;
+  --pin-ink:#0B1220;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#F4F7FB; --panel:#FFFFFF; --panel2:#EDF1F7;
+    --ink:#17202E; --muted:#5A6980; --line:#D7DFEA;
+    --plasma:#0E8F68; --plasma-dim:#66BFA4;
+    --impact:#BC651C; --impact-dim:#D9A374;
+    --pin-ink:#FFFFFF;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1220; --panel:#101A2E; --panel2:#0D1626;
+  --ink:#E8EEF7; --muted:#93A2B8; --line:#22314B;
+  --plasma:#46D6A8; --plasma-dim:#2B8A6C;
+  --impact:#F0A45B; --impact-dim:#A96B33;
+  --pin-ink:#0B1220;
+}
+:root[data-theme="light"]{
+  --bg:#F4F7FB; --panel:#FFFFFF; --panel2:#EDF1F7;
+  --ink:#17202E; --muted:#5A6980; --line:#D7DFEA;
+  --plasma:#0E8F68; --plasma-dim:#66BFA4;
+  --impact:#BC651C; --impact-dim:#D9A374;
+  --pin-ink:#FFFFFF;
+}
+
+/* ---------------------------------------------------------- base */
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:Charter,'Bitstream Charter','Sitka Text',Georgia,serif;
+  font-size:17px; line-height:1.68;
+}
+h1,h2,h3{ text-wrap:balance; }
+a{ color:var(--plasma); }
+.wrap{ max-width:920px; margin:0 auto; padding:0 24px; }
+.prose{ max-width:66ch; }
+.prose p{ margin:0 0 1em; }
+.prose b{ font-weight:600; }
+.eyebrow{
+  font-family:Bahnschrift,'Avenir Next Condensed','Arial Narrow',Arial,sans-serif;
+  font-weight:600; text-transform:uppercase; letter-spacing:.14em;
+  font-size:12.5px; color:var(--muted); margin:0 0 10px;
+}
+section{ padding:52px 0 6px; }
+code, pre{ font-family:'Cascadia Code',Consolas,'SF Mono',Menlo,monospace; }
+p code, li code, td code{
+  background:var(--panel2); border:1px solid var(--line);
+  border-radius:4px; padding:.05em .35em; font-size:.85em;
+}
+h2{
+  font-family:Bahnschrift,'Avenir Next Condensed','Arial Narrow',Arial,sans-serif;
+  font-weight:700; font-size:27px; text-transform:uppercase; letter-spacing:.02em;
+  margin:0 0 14px;
+}
+h3.sub{
+  font-family:Bahnschrift,'Avenir Next Condensed','Arial Narrow',Arial,sans-serif;
+  font-size:18px; letter-spacing:.02em; margin:34px 0 8px;
+}
+hr.sep{ border:none; border-top:1px solid var(--line); margin:48px 0 0; }
+
+/* ---------------------------------------------------------- hero */
+header{ padding:60px 0 40px; border-bottom:1px solid var(--line); }
+header h1{
+  font-family:Bahnschrift,'Avenir Next Condensed','Arial Narrow',Arial,sans-serif;
+  font-weight:700; font-size:clamp(32px,6vw,54px); line-height:1.05;
+  letter-spacing:.01em; margin:14px 0 16px; text-transform:uppercase;
+}
+header h1 .g{ color:var(--plasma); }
+header h1 .a{ color:var(--impact); }
+.lede{ font-size:19px; max-width:62ch; }
+#spectrum{
+  display:block; width:100%; height:170px; margin-top:32px;
+  background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+}
+.hero-cap{
+  display:flex; gap:20px; flex-wrap:wrap; margin-top:10px;
+  font-size:13px; color:var(--muted);
+  font-family:Bahnschrift,'Avenir Next Condensed','Arial Narrow',Arial,sans-serif;
+  letter-spacing:.06em;
+}
+.key{ display:inline-flex; align-items:center; gap:8px; }
+.key i{ width:18px; height:3px; border-radius:2px; display:inline-block; }
+.key .kp{ background:var(--plasma); } .key .ki{ background:var(--impact); }
+
+/* ---------------------------------------------------------- ascii diagrams */
+figure.diag{ margin:24px 0; }
+figure.diag pre{
+  margin:0; background:var(--panel2); color:var(--ink);
+  border:1px solid var(--line); border-radius:10px;
+  padding:18px 20px; overflow-x:auto;
+  font-size:13px; line-height:1.5;
+}
+figure.diag pre .p{ color:var(--plasma); font-weight:600; }
+figure.diag pre .i{ color:var(--impact); font-weight:600; }
+figure.diag pre .d{ color:var(--muted); }
+figure.diag figcaption{
+  font-family:Bahnschrift,'Avenir Next Condensed','Arial Narrow',Arial,sans-serif;
+  font-size:12px; text-transform:uppercase; letter-spacing:.1em;
+  color:var(--muted); margin:8px 2px 0;
+}
+
+/* ---------------------------------------------------------- code figures */
+figure.code{ margin:26px 0; }
+figure.code figcaption{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  background:var(--panel); border:1px solid var(--line); border-bottom:none;
+  border-radius:10px 10px 0 0; padding:9px 14px;
+}
+figure.code .file{ font-family:'Cascadia Code',Consolas,monospace; font-size:13px; }
+.tag{
+  font-family:Bahnschrift,'Avenir Next Condensed','Arial Narrow',Arial,sans-serif;
+  font-size:11px; text-transform:uppercase; letter-spacing:.1em;
+  padding:2.5px 9px; border-radius:99px; border:1px solid;
+}
+.tag.p{ color:var(--plasma); border-color:var(--plasma-dim); }
+.tag.i{ color:var(--impact); border-color:var(--impact-dim); }
+.tag.n{ color:var(--muted); border-color:var(--line); }
+figure.code pre{
+  margin:0; background:var(--code-bg); color:var(--code-ink);
+  border:1px solid var(--line); border-radius:0 0 10px 10px;
+  padding:16px 0; overflow-x:auto; font-size:13.2px; line-height:1.58;
+}
+figure.code pre .ln{ display:block; padding:0 16px; }
+figure.code pre .ln.hl{ background:rgba(127,180,232,.09); }
+.c{ color:var(--code-comment); font-style:italic; }
+.k{ color:var(--code-kw); } .n{ color:var(--code-num); }
+.pin{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:17px; height:17px; border-radius:50%; margin-left:10px;
+  font:600 11px Bahnschrift,'Arial Narrow',Arial,sans-serif; font-style:normal;
+  color:var(--pin-ink); vertical-align:middle; transform:translateY(-1px);
+}
+.pin.p{ background:var(--plasma); } .pin.i{ background:var(--impact); }
+ol.notes{ list-style:none; counter-reset:note; margin:12px 0 0; padding:0; max-width:70ch; }
+ol.notes li{
+  counter-increment:note; position:relative; padding-left:32px;
+  margin:0 0 9px; font-size:15px; color:var(--muted);
+}
+ol.notes li::before{
+  content:counter(note); position:absolute; left:0; top:2px;
+  width:17px; height:17px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font:600 11px Bahnschrift,'Arial Narrow',Arial,sans-serif;
+  color:var(--pin-ink);
+}
+ol.notes.pn li::before{ background:var(--plasma); }
+ol.notes.in li::before{ background:var(--impact); }
+ol.notes b{ color:var(--ink); font-weight:600; }
+
+/* ---------------------------------------------------------- tables + stats */
+.tbl{ overflow-x:auto; margin:22px 0; }
+table{ border-collapse:collapse; width:100%; font-size:14.5px; min-width:560px; }
+th{
+  text-align:left; font-family:Bahnschrift,'Avenir Next Condensed','Arial Narrow',Arial,sans-serif;
+  font-size:12px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted);
+  border-bottom:1.5px solid var(--line); padding:8px 14px 8px 0; font-weight:600;
+}
+td{ border-bottom:1px solid var(--line); padding:9px 14px 9px 0; vertical-align:top; }
+.fixed{
+  font-family:Bahnschrift,'Arial Narrow',Arial,sans-serif; font-size:11px;
+  text-transform:uppercase; letter-spacing:.08em; color:var(--plasma);
+  border:1px solid var(--plasma-dim); border-radius:99px; padding:2px 8px; white-space:nowrap;
+}
+.open{
+  font-family:Bahnschrift,'Arial Narrow',Arial,sans-serif; font-size:11px;
+  text-transform:uppercase; letter-spacing:.08em; color:var(--impact);
+  border:1px solid var(--impact-dim); border-radius:99px; padding:2px 8px; white-space:nowrap;
+}
+.stat-row{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin:24px 0; }
+.stat{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
+.stat .v{
+  font-family:Bahnschrift,'Avenir Next Condensed','Arial Narrow',Arial,sans-serif;
+  font-size:30px; font-weight:700; color:var(--plasma); font-variant-numeric:tabular-nums;
+}
+.stat.i .v{ color:var(--impact); }
+.stat .l{ font-size:13px; color:var(--muted); margin-top:2px; }
+footer{ padding:36px 0 64px; color:var(--muted); font-size:14px; }
+</style>
+
+<div class="wrap">
+
+<!-- ================================================== HERO -->
+<header>
+  <p class="eyebrow">CubeSat instrument &middot; PolarFire MPF300T &middot; Verilog &middot; a guided walkthrough</p>
+  <h1>Walk through a satellite<br>instrument's <span class="g">bra</span><span class="a">in</span></h1>
+  <p class="lede prose">
+    EDDI-FPGA is the digital signal processor for a small space instrument with two
+    jobs: <em>listen to the ionosphere</em> — the shell of electrified gas around Earth —
+    and <em>feel space debris</em> hitting the spacecraft. The original flew on a CubeSat
+    in 2024 on a microcontroller that could only do one job at a time. This page walks
+    through the Verilog that moves both jobs into an FPGA, in the order the signal
+    experiences them.
+  </p>
+  <canvas id="spectrum" width="1200" height="340" aria-label="Animated power spectrum: a noise floor with a plasma-frequency peak, and occasional debris impact transients"></canvas>
+  <div class="hero-cap">
+    <span class="key"><i class="kp"></i>plasma spectrum — the peak marks the electron density</span>
+    <span class="key"><i class="ki"></i>debris impact transient</span>
+  </div>
+</header>
+
+<!-- ================================================== 0 BIG PICTURE -->
+<section>
+  <p class="eyebrow">Step 0</p>
+  <h2>The big picture</h2>
+  <p class="prose">One antenna signal, two completely different questions asked of it:</p>
+  <figure class="diag">
+<pre>                          ┌─────────────────────────────────────────────┐
+                          │                FPGA (MPF300T)               │
+                          │                                             │
+antenna → amp → ADC ──┬──→│  <span class="p">qtn_core ──→ fft_r2 ──→ psd_avg   ──→ mean</span> │
+                      │   │  <span class="p">(window)     (FFT)      (average)  spectrum</span>│
+                      │   │  <span class="d">·············· "what is the ionosphere</span>     │
+                      │   │  <span class="d">    doing?"  (frequency domain)</span>             │
+                      │   │                                             │
+                      └──→│  <span class="i">debris_detector ──→ frozen 1536-sample</span>     │
+                          │  <span class="d">·············· "did something hit us?"</span>     │
+                          │  <span class="d">    (time domain)</span>            <span class="i">snapshot</span>       │
+                          │                                             │
+                          │  watchdog ── supervises everything          │
+                          └─────────────────────────────────────────────┘</pre>
+    <figcaption>The two concurrent signal paths</figcaption>
+  </figure>
+  <p class="prose">
+    The whole reason this project exists: the flight microcontroller could only run
+    <b>one</b> of those two paths at a time. On the FPGA they're separate pieces of
+    physical hardware, so they run simultaneously. Keep that in mind — everything below
+    is <em>hardware being described</em>, not a program executing line by line. Every
+    <code>always @(posedge clk)</code> block in every module fires on the same clock
+    tick, all at once, forever.
+  </p>
+</section>
+
+<!-- ================================================== 1 FIXED POINT -->
+<section>
+  <p class="eyebrow">Step 1</p>
+  <h2>The number system everything depends on</h2>
+  <p class="prose">
+    There's no floating point anywhere. Every value is an integer that we <em>agree</em>
+    to interpret as a fraction. The convention is <b>Q1.15</b>: a 16-bit signed integer
+    where we pretend the value is divided by 2<sup>15</sup> = 32768.
+  </p>
+  <figure class="diag">
+<pre>Q1.15:   0100 0000 0000 0000  =  16384  → means 16384/32768 = <span class="p">0.5</span>
+         0111 1111 1111 1111  =  32767  → means <span class="p">~0.99997</span>  (max)
+         1000 0000 0000 0000  = -32768  → means <span class="p">-1.0</span>      (min)</pre>
+    <figcaption>Fixed-point: integers wearing a costume</figcaption>
+  </figure>
+  <p class="prose">
+    Multiplying two Q1.15 numbers gives a Q2.30 result (32 bits), so after every
+    multiply you'll see <code>&gt;&gt;&gt; 15</code> — an arithmetic right shift that
+    divides by 2<sup>15</sup> and puts the decimal point back where it belongs:
+  </p>
+  <figure class="diag">
+<pre>0.5 × 0.5:   16384 × 16384 = 268,435,456          (Q2.30)
+             268,435,456 &gt;&gt;&gt; 15 = 8192  =  <span class="p">0.25 in Q1.15  ✓</span></pre>
+    <figcaption>Every multiply is followed by a shift</figcaption>
+  </figure>
+  <p class="prose">
+    That's the entire trick. Whenever a shift follows a multiply in this code, it isn't
+    magic — it's bookkeeping.
+  </p>
+</section>
+
+<!-- ================================================== 2 QTN CORE -->
+<section>
+  <p class="eyebrow">Step 2 &middot; rtl/qtn_core.v</p>
+  <h2>The front door of the ionosphere path</h2>
+
+  <h3 class="sub">Why a window at all?</h3>
+  <p class="prose">
+    The FFT is going to chop the ADC stream into 1024-sample frames, and it
+    mathematically assumes each frame repeats forever, end-to-start. If a frame ends at
+    a different level than it began, that seam looks like a violent step edge — and a
+    step edge contains <em>every</em> frequency, smearing garbage across the whole
+    spectrum. The fix: multiply each frame by a bell curve (the <b>Hann window</b>) that
+    fades both ends to zero. No ends, no seam.
+  </p>
+  <figure class="diag">
+<pre>raw frame:        window:              windowed frame:
+╱╲╱╲╱╲╱╲╱╲╱╲      ▁▂▄▆█▆▄▂▁            ▁▂╱╲╱╲╱╲╱╲▂▁
+<span class="d">(edges cut        (fades edges         (starts and ends
+ mid-swing)        to zero)             at zero — no seam)</span></pre>
+    <figcaption>The Hann window removes the fake edges framing creates</figcaption>
+  </figure>
+
+  <h3 class="sub">The two-stage pipeline</h3>
+  <figure class="code">
+    <figcaption><span class="file">rtl/qtn_core.v</span><span class="tag p">ionosphere path</span></figcaption>
+    <pre><span class="ln"><span class="c">// stage 1: register the sample, look up its window coefficient</span></span>
+<span class="ln hl"><span class="k">always</span> @(<span class="k">posedge</span> clk) <span class="k">begin</span><i class="pin p">1</i></span>
+<span class="ln">    coeff_q &lt;= hann_rom[n];</span>
+<span class="ln">    samp_d  &lt;= sample_in;</span>
+<span class="ln"><span class="k">end</span></span>
+<span class="ln"><span class="c">// stage 2: multiply, then scale back to 16 bits</span></span>
+<span class="ln hl"><span class="k">wire signed</span> [<span class="n">31</span>:<span class="n">0</span>] prod = samp_d * coeff_q;<i class="pin p">2</i></span>
+<span class="ln hl">win_q &lt;= prod &gt;&gt;&gt; <span class="n">15</span>;<i class="pin p">3</i></span></pre>
+    <ol class="notes pn">
+      <li><b>Why two stages:</b> reading a ROM takes one clock; multiplying takes another.
+        Doing both in one tick would limit how fast the whole chip can clock.</li>
+      <li>16 bits &times; 16 bits gives a 32-bit product — the width is declared so
+        nothing overflows silently.</li>
+      <li>The Q1.15 rescale from Step 1, in the wild.</li>
+    </ol>
+  </figure>
+  <figure class="diag">
+<pre>clock tick:     1        2        3        4
+              ┌──────┬────────┬────────┬────────┐
+sample #1 →   │lookup│multiply│  done  │        │
+sample #2 →   │      │ lookup │multiply│  done  │
+sample #3 →   │      │        │ lookup │multiply│
+              └──────┴────────┴────────┴────────┘
+<span class="d">one sample enters AND one exits every tick —
+latency is 2 ticks, but throughput is full speed</span></pre>
+    <figcaption>Pipelining: an assembly line, one small job per station per tick</figcaption>
+  </figure>
+
+  <h3 class="sub">The handshake — and the bug the review caught here</h3>
+  <p class="prose">
+    <code>qtn_core</code> talks to the outside world with a <b>ready/valid handshake</b>:
+    the sender raises <code>valid</code> when it has a sample, the receiver raises
+    <code>ready</code> when it can take one, and a transfer happens only on a clock tick
+    where <em>both</em> are high. Simple — but the edges are where bugs live. The gate
+    that decides <code>ready</code>:
+  </p>
+  <figure class="code">
+    <figcaption><span class="file">rtl/qtn_core.v</span><span class="tag p">ionosphere path</span></figcaption>
+    <pre><span class="ln hl"><span class="k">assign</span> sample_ready = fft_ready &amp;&amp; !frame_wait &amp;&amp; !all_loaded &amp;&amp; !spectrum_ready;<i class="pin p">1</i></span></pre>
+    <ol class="notes pn">
+      <li><b><code>all_loaded</code> is the review fix.</b> Originally the gate relied on
+        <code>spectrum_ready</code>, which arrives two clock ticks after the last sample
+        was actually needed. For those two ticks the door stood open and exactly one
+        stray sample slipped in — invisible only because <code>hann[0] = 0</code>
+        multiplied it by zero. Now a latch slams the door the instant the final frame's
+        final sample is accepted.</li>
+    </ol>
+  </figure>
+</section>
+
+<!-- ================================================== 3 FFT -->
+<section>
+  <p class="eyebrow">Step 3 &middot; rtl/fft_r2.v</p>
+  <h2>The heart of the machine</h2>
+  <p class="prose">
+    This module turns 1024 time samples into 1024 frequency bins, in three phases:
+    <b>load</b>, <b>compute</b>, <b>unload</b>.
+  </p>
+
+  <h3 class="sub">Load — the bit-reversal shuffle</h3>
+  <p class="prose">
+    The radix-2 FFT needs its input in a scrambled order to produce output in natural
+    order. The scramble is beautifully simple: write each sample to the address you get
+    by <b>mirroring the bits of its index</b>:
+  </p>
+  <figure class="diag">
+<pre>sample #1  =  index 0000000001  →  stored at 1000000000  =  address <span class="p">512</span>
+sample #2  =  index 0000000010  →  stored at 0100000000  =  address <span class="p">256</span>
+sample #3  =  index 0000000011  →  stored at 1100000000  =  address <span class="p">768</span></pre>
+    <figcaption>Bit reversal — in hardware, just crossed wires; zero cost</figcaption>
+  </figure>
+  <figure class="code">
+    <figcaption><span class="file">rtl/fft_r2.v</span><span class="tag p">ionosphere path</span></figcaption>
+    <pre><span class="ln"><span class="k">function</span> [LOG2N-<span class="n">1</span>:<span class="n">0</span>] bitrev;</span>
+<span class="ln">    <span class="k">input</span> [LOG2N-<span class="n">1</span>:<span class="n">0</span>] v;</span>
+<span class="ln">    <span class="k">integer</span> i;</span>
+<span class="ln hl">    <span class="k">for</span> (i = <span class="n">0</span>; i &lt; LOG2N; i = i + <span class="n">1</span>)</span>
+<span class="ln hl">        bitrev[i] = v[LOG2N-<span class="n">1</span>-i];   <span class="c">// bit 0 ↔ bit 9, bit 1 ↔ bit 8, ...</span></span>
+<span class="ln"><span class="k">endfunction</span></span></pre>
+  </figure>
+
+  <h3 class="sub">Compute — the butterfly</h3>
+  <p class="prose">
+    The entire FFT is one small operation repeated 5,120 times. Take two values A and B
+    out of RAM, multiply B by a <b>twiddle factor</b> W (a point on the unit circle —
+    the rotating ruler the FFT measures against), and put back their sum and difference:
+  </p>
+  <figure class="diag">
+<pre>            A ────────────●──────→  A′ = (A + W·B) / 2
+                           ╲   ╱
+                            ╲ ╱      <span class="d">← the crossing shape is why</span>
+                            ╱ ╲      <span class="d">  it's called a "butterfly"</span>
+            B ──×W ────────●──────→  B′ = (A − W·B) / 2</pre>
+    <figcaption>The butterfly: the FFT's only move</figcaption>
+  </figure>
+  <p class="prose">
+    Ten rounds for 1024 points. In round 1 the butterflies pair neighbors; each round
+    the pairs stretch twice as far apart:
+  </p>
+  <figure class="diag">
+<pre>round 1:   [0↔1] [2↔3] [4↔5] ...          span 1
+round 2:   [0↔2] [1↔3] [4↔6] ...          span 2
+round 3:   [0↔4] [1↔5] [2↔6] ...          span 4
+  ⋮                                          ⋮
+round 10:  [0↔512] [1↔513] ...            span 512</pre>
+    <figcaption>512 butterflies &times; 10 rounds = 5,120 operations per spectrum</figcaption>
+  </figure>
+
+  <h3 class="sub">The 5-tick sequencer</h3>
+  <p class="prose">
+    RAM gives you one read per clock, and a read takes a tick to come back. So each
+    butterfly is choreographed by a small state machine:
+  </p>
+  <figure class="diag">
+<pre>┌────────┐   ┌────────┐   ┌─────────┐   ┌─────────────┐   ┌─────────────┐
+│ S_RD_A │──→│ S_RD_B │──→│  S_MUL  │──→│    S_WRA    │──→│    S_WRB    │─┐
+│ask for │   │ask for │   │catch A; │   │catch B; do  │   │write back   │ │
+│A and W │   │   B    │   │W arrives│   │W·B; write A′│   │B′; advance  │ │
+└────────┘   └────────┘   └─────────┘   └─────────────┘   └──────┬──────┘ │
+     ↑                                                           │        │
+     └────────────────────── next butterfly ─────────────────────┘        │
+                                             <span class="d">after round 10: unload bins</span></pre>
+    <figcaption>Five ticks per butterfly ≈ 26,000 clocks per FFT — 0.26 ms at 100 MHz, and the mission needs only 20 spectra/s</figcaption>
+  </figure>
+
+  <h3 class="sub">Two safety details inside the math</h3>
+  <p class="prose">
+    <b>Scaling.</b> Adding two numbers can double the magnitude; do that ten rounds in a
+    row and you overflow 16 bits by a factor of 1024. So every butterfly divides its
+    results by 2 — after ten rounds the output equals FFT/1024, which conveniently
+    matches NumPy's <code>fft(x)/N</code>, making verification a direct comparison.
+  </p>
+  <p class="prose">
+    <b>Saturation.</b> If a result <em>still</em> won't fit, <code>halve_sat</code>
+    clamps it instead of letting it wrap:
+  </p>
+  <figure class="diag">
+<pre>wrapping (disaster):    32767 + 1  →  <span class="i">-32768</span>   <span class="d">loudest signal becomes
+                                                its own opposite</span>
+saturating (graceful):  32767 + 1  →  <span class="p">32767</span>    <span class="d">distorted, but sane</span></pre>
+    <figcaption>Why every write goes through halve_sat</figcaption>
+  </figure>
+  <figure class="code">
+    <figcaption><span class="file">rtl/fft_r2.v</span><span class="tag p">ionosphere path</span></figcaption>
+    <pre><span class="ln">S_WRA: <span class="k">begin</span></span>
+<span class="ln">    <span class="c">// rdata holds B; t = W*B is valid combinationally</span></span>
+<span class="ln hl">    ram_re[idxA] &lt;= halve_sat(a_re_x + {{<span class="n">2</span>{t_re_nxt[<span class="n">17</span>]}}, t_re_nxt});<i class="pin p">1</i></span>
+<span class="ln">    state &lt;= S_WRB;</span>
+<span class="ln"><span class="k">end</span></span>
+<span class="ln">S_WRB: <span class="k">begin</span></span>
+<span class="ln hl">    ram_re[idxB] &lt;= halve_sat(a_re_x - {{<span class="n">2</span>{t_re[<span class="n">17</span>]}}, t_re});<i class="pin p">2</i></span>
+<span class="ln">    <span class="c">// ... then advance to the next butterfly, group, or round</span></span>
+<span class="ln"><span class="k">end</span></span></pre>
+    <ol class="notes pn">
+      <li>Position A gets <i>a + W·b</i>. The odd <code>{{2{...}}}</code> syntax is sign
+        extension — padding a negative number's sign bit so 18-bit and 20-bit values add
+        correctly.</li>
+      <li>Position B gets <i>a − W·b</i> — the sum-and-difference of the butterfly
+        diagram, written back in place.</li>
+    </ol>
+  </figure>
+</section>
+
+<!-- ================================================== 4 PSD -->
+<section>
+  <p class="eyebrow">Step 4 &middot; rtl/psd_avg.v</p>
+  <h2>From spectrum to measurement</h2>
+  <p class="prose">
+    The FFT streams out 513 complex bins (for real input the top half of the spectrum is
+    a mirror image, so bins 0…512 carry everything). Each becomes a <b>power</b>:
+    real&sup2; + imaginary&sup2;. Phase is thrown away — for this measurement only
+    energy matters. And because one spectrum of thermal hiss is too jittery to read,
+    powers are accumulated across several frames and averaged. Noise is random and
+    cancels; the plasma peak is not, and stays.
+  </p>
+  <figure class="diag">
+<pre>1 frame:     ~~/\~˄~~˅~/\~~<span class="p">█</span>~~˄~/\~~     <span class="d">(peak barely visible)</span>
+4 averaged:  ______________<span class="p">█</span>________     <span class="d">(peak unmistakable)</span>
+                            ↑
+              <span class="p">bin 77 = plasma frequency = electron density</span></pre>
+    <figcaption>Averaging: the whole reason the measurement works</figcaption>
+  </figure>
+  <figure class="code">
+    <figcaption><span class="file">rtl/psd_avg.v</span><span class="tag p">ionosphere path</span></figcaption>
+    <pre><span class="ln"><span class="c">// power in this frequency bin</span></span>
+<span class="ln"><span class="k">wire</span> [<span class="n">32</span>:<span class="n">0</span>] p = re*re + im*im;</span>
+<span class="ln"></span>
+<span class="ln"><span class="c">// first frame writes fresh; later frames add on top</span></span>
+<span class="ln hl"><span class="k">wire</span> [ACCW-<span class="n">1</span>:<span class="n">0</span>] acc_new = first_q ? p_q : acc_rd + p_q;<i class="pin p">1</i></span>
+<span class="ln hl"><span class="k">wire</span> [ACCW-<span class="n">1</span>:<span class="n">0</span>] mean    = acc_rd &gt;&gt; LOG2AVG;<i class="pin p">2</i></span></pre>
+    <ol class="notes pn">
+      <li><b>No separate "clear the RAM" pass:</b> the first frame's write <em>is</em>
+        the clear. An accumulator RAM holds a running sum for each of the 513 bins.</li>
+      <li>Averaging by right-shift: the frame count is forced to be a power of two, so
+        dividing is just dropping bits. Division costs real hardware; this is free.</li>
+    </ol>
+  </figure>
+</section>
+
+<!-- ================================================== 5 DEBRIS -->
+<section>
+  <p class="eyebrow">Step 5 &middot; rtl/debris_detector.v</p>
+  <h2>Statistics with a hair trigger</h2>
+  <p class="prose">
+    Different philosophy entirely. The QTN path processes everything identically,
+    forever. The debris path must <em>judge</em> — almost everything it sees is boring,
+    and it has to catch the one-in-a-million exception without crying wolf. Its life is
+    a five-state loop:
+  </p>
+  <figure class="diag">
+<pre>      power-on
+         │
+         ▼
+ ┌────────────┐  2048 samples   ┌────────────┐  2048 samples
+ │ <span class="i">CAL_MEAN</span>   │────────────────→│  <span class="i">CAL_VAR</span>   │──────────────┐
+ │ learn the  │                 │ learn σ and│              │
+ │ DC level   │                 │ wobble rate│              ▼
+ └────────────┘                 └────────────┘      ┌────────────┐
+         ▲                                          │   <span class="i">ARMED</span>    │
+         │  every ~60 s (recalibrate)               │  watching  │
+         └──────────────────────────────────────────└─────┬──────┘
+                                     spike &gt; 4σ           │
+                        ┌─────────────────────────────────┘
+                        ▼
+                 ┌────────────┐  real impact  ┌────────────┐
+                 │   <span class="i">POST</span>     │──────────────→│   <span class="i">READY</span>    │── ack or
+                 │ capture +  │               │ event      │   timeout
+                 │ interrogate│──────┐        │ frozen     │─────┐
+                 └────────────┘      │        └────────────┘     │
+                            <span class="d">false alarm:</span>                       <span class="d">back</span>
+                            <span class="d">discard, re-arm</span> ───────────────→ <span class="d">to ARMED</span></pre>
+    <figcaption>The detector's whole life. The recalibration loop and the READY timeout are both code-review fixes</figcaption>
+  </figure>
+
+  <h3 class="sub">The trigger: 4σ without a square root</h3>
+  <p class="prose">
+    Calibration learns what "normal" looks like: the average level, the noise spread
+    &sigma;, and how often the signal wobbles across its own average. Then a sample is
+    suspicious if it sits more than 4 standard deviations out — a one-in-16,000 fluke
+    for noise. But computing &sigma; needs a square root, which is genuinely painful in
+    hardware. So the code squares both sides of the inequality instead:
+  </p>
+  <figure class="diag">
+<pre>|x − mean| &gt; 4σ      ⇔      (x − mean)² &gt; 16 · variance
+
+<span class="d">one subtract, one multiply, one shift-by-4, one compare.
+No square root anywhere in the machine.</span></pre>
+    <figcaption>Algebra as a hardware optimization</figcaption>
+  </figure>
+  <figure class="code">
+    <figcaption><span class="file">rtl/debris_detector.v</span><span class="tag i">debris path</span></figcaption>
+    <pre><span class="ln"><span class="k">wire signed</span> [<span class="n">16</span>:<span class="n">0</span>] diff    = in_sample - cal_mean;</span>
+<span class="ln"><span class="k">wire</span>        [<span class="n">33</span>:<span class="n">0</span>] diff_sq = diff * diff;</span>
+<span class="ln hl"><span class="k">wire</span>        [<span class="n">31</span>:<span class="n">0</span>] var_eff = (cal_var &lt; VAR_FLOOR) ? VAR_FLOOR : cal_var;<i class="pin i">1</i></span>
+<span class="ln hl"><span class="k">wire</span>        [<span class="n">35</span>:<span class="n">0</span>] thresh  = {var_eff, <span class="n">4'b0</span>};  <span class="c">// 16*var = (4σ)²</span><i class="pin i">2</i></span>
+<span class="ln"><span class="k">wire</span> trigger = (diff_sq &gt; thresh);</span></pre>
+    <ol class="notes in">
+      <li><b>The most important review fix in the design.</b> If calibration happens
+        during a dead-quiet stretch, variance is zero — and zero times sixteen is zero,
+        so every 1-bit wiggle would trigger while the frequency check below rejected
+        every one of them. A real impact would be discarded, silently, forever. The
+        floor makes a degenerate calibration merely conservative instead of fatal.</li>
+      <li><code>{var_eff, 4'b0}</code> glues four zero bits on the right — that's
+        &times;16 as pure wiring.</li>
+    </ol>
+  </figure>
+
+  <h3 class="sub">Qualification: the fingerprint check</h3>
+  <p class="prose">
+    Loudness alone isn't proof — interference is loud too. But an impact has a
+    signature: the vaporised dust grain's plasma cloud rings at <em>kilohertz</em>, far
+    slower than the fizzy background. So for the first 128 samples after a trigger, the
+    detector counts mean-crossings and demands the event wobble at less than a third of
+    the background rate:
+  </p>
+  <figure class="diag">
+<pre>background noise:   ╱╲╱╲╱╲╱╲╱╲╱╲╱╲╱╲    <span class="d">crosses mean ~every 2 samples</span>
+impact ringdown:    ___╱▔▔╲___╱▔╲__     <span class="d">crosses mean ~every 17 samples</span>
+                        <span class="i">slow decay ← what a vaporised dust
+                                     grain "sounds" like</span></pre>
+    <figcaption>Amplitude + frequency together are the fingerprint</figcaption>
+  </figure>
+  <figure class="code">
+    <figcaption><span class="file">rtl/debris_detector.v</span><span class="tag i">debris path</span></figcaption>
+    <pre><span class="ln hl"><span class="k">wire</span> qualify = bg_degen || (event_zc_x3 &lt; bg_zc_scaled);<i class="pin i">1</i></span></pre>
+    <ol class="notes in">
+      <li>The &times;3 is computed as <code>x + (x &lt;&lt; 1)</code> — dodging real
+        arithmetic again — and <code>bg_degen</code> is the other half of the review
+        fix: if the background is so quiet its crossing rate carries no information,
+        the frequency test is skipped rather than letting it veto everything.</li>
+    </ol>
+  </figure>
+
+  <h3 class="sub">The capture buffer: recording the past</h3>
+  <p class="prose">
+    The best part. The buffer is <b>circular</b> — 1536 slots, always recording, new
+    samples overwriting the oldest:
+  </p>
+  <figure class="diag">
+<pre>      write pointer keeps looping forever →
+    ┌──────────────────────────────────────────┐
+    │ ... older ← ← ← ← ● newest               │
+    └────────────────────│─────────────────────┘
+                      <span class="i">TRIGGER!</span>
+                         │
+     freeze after 1023 more samples:
+    ┌──────────────┬─●──────────────────────────┐
+    │  512 samples │ │      1023 samples        │
+    │  <span class="i">BEFORE</span> the  │ │      <span class="i">AFTER</span>               │
+    │  impact      │ │                          │
+    └──────────────┴─────────────────────────── ┘
+<span class="d">the instrument recorded the lead-up to an event
+before it knew the event would happen</span></pre>
+    <figcaption>A circular buffer means the "before" already exists when the trigger fires</figcaption>
+  </figure>
+  <p class="prose">
+    By the time the trigger fires, the 512 samples of "before" already sit in the
+    buffer; the detector just stops overwriting at the right moment. The snapshot then
+    holds in <code>READY</code> until the spacecraft computer collects it — or, per
+    another review fix, until a timeout auto-releases it and bumps an
+    <code>events_dropped</code> counter, because a detector frozen waiting on a dead
+    comms link would miss every subsequent impact for the rest of the mission.
+  </p>
+</section>
+
+<!-- ================================================== 6 WATCHDOG -->
+<section>
+  <p class="eyebrow">Step 6 &middot; rtl/watchdog.v</p>
+  <h2>The dead-man's switch</h2>
+  <p class="prose">
+    The simplest module, and the most space-flavored. A counter climbs every clock. The
+    healthy system must "kick" it back to zero regularly. If the kicks ever stop —
+    software wedged, state machine stuck, radiation flipped a bit — the counter tops out
+    and the watchdog resets everything:
+  </p>
+  <figure class="diag">
+<pre>cnt │        ╱      ╱      ╱                 ╱ <span class="i">← TIMEOUT reached:</span>
+    │       ╱      ╱      ╱                 ╱    <span class="i">pull reset, log it</span>
+    │      ╱      ╱      ╱      ...        ╱
+    └─────┴──────┴──────┴─────────────────┴──────→ time
+          kick   kick   kick    <span class="d">(kicks stop)</span></pre>
+    <figcaption>Sawtooth of health. The flight firmware never enabled its watchdog — the thesis lists that as a gap</figcaption>
+  </figure>
+  <figure class="code">
+    <figcaption><span class="file">rtl/watchdog.v</span><span class="tag n">supervision</span></figcaption>
+    <pre><span class="ln"><span class="c">// a stuck-high kick must not silence the watchdog: only edges count</span></span>
+<span class="ln hl"><span class="k">wire</span> kick_edge = kick &amp;&amp; !kick_d;<i class="pin p">1</i></span>
+<span class="ln"></span>
+<span class="ln"><span class="k">end else if</span> (kick_edge) <span class="k">begin</span></span>
+<span class="ln">    cnt &lt;= {WIDTH{<span class="n">1'b0</span>}};</span>
+<span class="ln hl"><span class="k">end else if</span> (cnt &gt;= TIMEOUT-<span class="n">1</span>) <span class="k">begin</span><i class="pin p">2</i></span>
+<span class="ln">    wdt_rst     &lt;= <span class="n">1'b1</span>;</span>
+<span class="ln hl">    fired_count &lt;= fired_count + <span class="n">1</span>;<i class="pin p">3</i></span>
+<span class="ln"><span class="k">end</span></span></pre>
+    <ol class="notes pn">
+      <li>The healthy system must actively <em>change</em> the kick signal. If a fault
+        freezes the kick line high, a level-sensitive check would be fooled forever; an
+        edge detector isn't.</li>
+      <li><code>&gt;=</code> instead of <code>==</code>: even if radiation bumps the
+        counter <em>past</em> the target, the timeout still fires. This is space.</li>
+      <li>The fired-counter deliberately survives the watchdog's own reset, so ground
+        control can ask "how many times did you have to restart yourself?" — silent
+        recovery hides exactly the evidence you need.</li>
+    </ol>
+  </figure>
+</section>
+
+<!-- ================================================== 7 PROOF -->
+<section>
+  <p class="eyebrow">Step 7 &middot; fpga/sim + fpga/tb</p>
+  <h2>How we know any of this is true</h2>
+  <p class="prose">Nothing has touched silicon. The proof chain is:</p>
+  <figure class="diag">
+<pre>gen_vectors.py (NumPy)           Questa simulator
+┌──────────────────────┐        ┌──────────────────────┐
+│ synth test signals   │──.mem─→│ the actual Verilog,  │
+│ + compute the exact  │        │ clock tick by tick   │
+│ float answers        │──.mem─→│ vs. golden answers   │──→ <span class="p">TB_PASS</span> / <span class="i">TB_FAIL</span>
+└──────────────────────┘        └──────────────────────┘</pre>
+    <figcaption>Golden-model verification: hardware vs. mathematical truth</figcaption>
+  </figure>
+  <p class="prose">
+    The Python even replicates the RTL's fixed-point windowing <em>bit-exactly</em>, so
+    the only difference left between "golden" and "hardware" is the FFT's rounding —
+    which is the thing being measured.
+  </p>
+  <div class="stat-row">
+    <div class="stat"><div class="v">0.007%</div><div class="l">error of the pipeline's spectrum peak vs. NumPy's floating-point answer</div></div>
+    <div class="stat"><div class="v">513</div><div class="l">frequency bins individually checked against the golden FFT</div></div>
+    <div class="stat i"><div class="v">+1</div><div class="l">samples after the injected impact that the debris trigger fired</div></div>
+    <div class="stat i"><div class="v">0</div><div class="l">false alarms across 45,000 samples of pure noise</div></div>
+  </div>
+
+  <h3 class="sub">What the adversarial review changed</h3>
+  <p class="prose">
+    Passing tests only proves the code handles what the tests imagined. An independent
+    review pass hunted for what they didn't — degenerate inputs, stuck links, orbital
+    drift — and reproduced two real bugs in simulation. All confirmed findings are fixed
+    and re-verified; they're marked where they appear in the walkthrough above.
+  </p>
+  <div class="tbl">
+    <table>
+      <tr><th>Finding</th><th>Where it appears above</th><th></th></tr>
+      <tr><td>Degenerate calibration bricked debris detection</td><td>Step 5 — <code>VAR_FLOOR</code> + <code>bg_degen</code></td><td><span class="fixed">fixed</span></td></tr>
+      <tr><td>No recalibration over an orbit's thermal drift</td><td>Step 5 — the ~60 s loop in the state diagram</td><td><span class="fixed">fixed</span></td></tr>
+      <tr><td>Frozen forever on a missed acknowledgment</td><td>Step 5 — READY timeout + <code>events_dropped</code></td><td><span class="fixed">fixed</span></td></tr>
+      <tr><td>One-sample handshake leak per averaging run</td><td>Step 2 — the <code>all_loaded</code> gate</td><td><span class="fixed">fixed</span></td></tr>
+      <tr><td>ROM contents may not survive synthesis on PolarFire — sims stay green while hardware reads zeros</td><td>To be validated in the first Libero trial</td><td><span class="open">open</span></td></tr>
+    </table>
+  </div>
+  <p class="prose">
+    The meta-lesson worth retelling: the original instrument's sister satellite was
+    killed a month into its mission by a radiation event. For space hardware, the happy
+    path is the easy 80% — robustness against the input you never imagined <em>is</em>
+    the design problem.
+  </p>
+</section>
+
+<hr class="sep">
+
+<!-- ================================================== FOOTER -->
+<footer>
+  <p>
+    <b>Repo map:</b> <code>fpga/rtl/</code> — five synthesizable Verilog modules
+    (<code>fft_r2</code>, <code>psd_avg</code>, <code>qtn_core</code>,
+    <code>debris_detector</code>, <code>watchdog</code>) &middot;
+    <code>fpga/tb/</code> — self-checking testbenches &middot;
+    <code>fpga/sim/</code> — NumPy golden-vector generator + Questa run script
+    (<code>sh run_all.sh</code>).
+    Heritage: the EDDI instrument (University of Sydney / CUAVA), flown on the
+    Waratah&nbsp;Seed-1 CubeSat, launched August 2024 and still returning data.
+    Target: Microchip PolarFire MPF300T &middot; ADC: LTC2165 or ADS5560 (16-bit).
+  </p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var cv = document.getElementById('spectrum');
+  var ctx = cv.getContext('2d');
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var W = cv.width, H = cv.height;
+
+  function css(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  var seed = 7;
+  function rnd(){ seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+
+  var NB = 240;
+  var base = [];
+  for (var i = 0; i < NB; i++) base.push(0.10 + 0.05*rnd());
+  var peakBin = Math.floor(NB * 0.55);
+
+  var t = 0;
+  var impact = -1, impactX = 0;
+
+  var noiseCache = {};
+  function rndAt(i){
+    var k = i + '_' + (t|0);
+    if (!(k in noiseCache)){ if (Object.keys(noiseCache).length > 4000) noiseCache = {};
+      noiseCache[k] = (rnd()*2-1); }
+    return noiseCache[k];
+  }
+
+  function draw(){
+    var plasma = css('--plasma'), imp = css('--impact'),
+        line = css('--line'), muted = css('--muted');
+    ctx.clearRect(0,0,W,H);
+
+    ctx.strokeStyle = line; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (var gx = 0; gx <= 6; gx++){ var x = 40 + gx*(W-70)/6; ctx.moveTo(x,16); ctx.lineTo(x,H-30); }
+    for (var gy = 0; gy <= 3; gy++){ var y = 16 + gy*(H-46)/3; ctx.moveTo(40,y); ctx.lineTo(W-30,y); }
+    ctx.stroke(); ctx.globalAlpha = 1;
+
+    var pts = [];
+    for (var i = 0; i < NB; i++){
+      var v = base[i] + 0.035*Math.sin(0.9*i + t*0.6) * rndAt(i);
+      var d = (i - peakBin) / 5.5;
+      v += 0.62 * Math.exp(-d*d);
+      var d2 = (i - peakBin*0.42) / 14;
+      v += 0.10 * Math.exp(-d2*d2);
+      pts.push(v);
+    }
+    ctx.beginPath();
+    for (var i = 0; i < NB; i++){
+      var x = 40 + i*(W-70)/(NB-1);
+      var y = (H-30) - pts[i]*(H-60);
+      if (i === 0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = plasma; ctx.lineWidth = 2.2; ctx.stroke();
+
+    ctx.lineTo(W-30, H-30); ctx.lineTo(40, H-30); ctx.closePath();
+    ctx.globalAlpha = 0.10; ctx.fillStyle = plasma; ctx.fill(); ctx.globalAlpha = 1;
+
+    var px = 40 + peakBin*(W-70)/(NB-1);
+    ctx.setLineDash([4,5]); ctx.strokeStyle = muted; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px, 16); ctx.lineTo(px, H-30); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = muted;
+    ctx.font = '600 13px Bahnschrift, "Arial Narrow", Arial, sans-serif';
+    ctx.fillText('fₚ  → electron density', px + 10, 32);
+    ctx.fillText('frequency →', W-140, H-8);
+
+    if (impact >= 0){
+      var ix = impactX, amp = Math.max(0, 1 - impact/28);
+      ctx.strokeStyle = imp; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (var k = -18; k <= 46; k++){
+        var xx = ix + k*2.1;
+        if (xx < 40 || xx > W-30) continue;
+        var env = k < 0 ? 0 : Math.exp(-k/16);
+        var yy = (H-30) - (0.16 + amp*env*0.55*Math.sin(k*0.55)) * (H-60) * 0.55;
+        if (k === -18) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy);
+      }
+      ctx.stroke();
+      impact++;
+      if (impact > 34) impact = -1;
+    } else if (!reduced && rnd() < 0.008){
+      impact = 0; impactX = 70 + rnd()*(W-160);
+    }
+  }
+
+  if (reduced){ impact = 8; impactX = W*0.25; draw(); }
+  else (function loop(){ t += 0.5; draw(); requestAnimationFrame(loop); })();
+
+  new MutationObserver(function(){ if (reduced) draw(); })
+    .observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+})();
+</script>
