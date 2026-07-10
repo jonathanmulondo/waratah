@@ -9,12 +9,9 @@ cd "$(dirname "$0")"
 python gen_vectors.py
 
 [ -d work ] || vlib work
-vlog -quiet ../rtl/fft_r2.v ../rtl/psd_avg.v ../rtl/qtn_core.v \
-     ../rtl/debris_detector.v ../rtl/watchdog.v \
-     +incdir+mem \
-     ../tb/tb_fft.v ../tb/tb_qtn.v ../tb/tb_debris.v ../tb/tb_watchdog.v
+vlog -quiet ../rtl/*.v +incdir+mem ../tb/*.v
 
-TBS="${1:-tb_fft tb_qtn tb_debris tb_watchdog}"
+TBS="${1:-tb_fft tb_qtn tb_debris tb_watchdog tb_cic tb_burst tb_payload tb_top}"
 FAILED=0
 for tb in $TBS; do
     echo "================ $tb ================"

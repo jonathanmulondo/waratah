@@ -11,3 +11,6 @@ fpga/sim/mem/
 # Libero (future)
 fpga/libero/
 *.jou
+
+# MS Office lock files
+~$*

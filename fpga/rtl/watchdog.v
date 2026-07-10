@@ -48,9 +48,11 @@ module watchdog #(
     wire kick_edge = kick && !kick_d;
 
     // parameter sanity (simulation-time only): TIMEOUT must be reachable
-    // by a WIDTH-bit counter, or the watchdog would never fire
+    // by a WIDTH-bit counter, or the watchdog would never fire.
+    // 64-bit compare: (1 << WIDTH) in 32-bit math wraps to 0 at WIDTH=32
+    // and the check would cry wolf on every legal configuration.
     initial begin
-        if (TIMEOUT > (1 << WIDTH))
+        if ({32'b0, TIMEOUT} > (64'd1 << WIDTH))
             $display("ERROR: watchdog TIMEOUT %0d exceeds counter range (WIDTH=%0d)",
                      TIMEOUT, WIDTH);
     end
