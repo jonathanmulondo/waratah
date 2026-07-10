@@ -84,6 +84,26 @@ hardware would read zeros while sims stay green.
 - Runtime-selectable 512/1024 FFT (currently a synthesis parameter).
 - ADC interface module: LVDS DDR deserialiser for LTC2165/ADS5560;
   decimation tap for the debris path if a single shared ADC is chosen.
+  Constraints from the analog front-end design (LMH6629 chain, QTN path,
+  per its designer 2026-07-10):
+  - **Effective sample rate locked at 40 Msps.** The chain's anti-alias
+    LPF is designed for a 20 MHz Nyquist; sampling slower would alias
+    the 17.5–20+ MHz region into band. Faster is safe only as
+    oversample-then-decimate back to 40 Msps effective.
+  - **Select two's-complement output mode** on the ADC (LTC2165 is
+    pin-selectable offset-binary/two's-complement); the whole pipeline
+    assumes signed 16-bit. Forgetting this produces garbage spectra
+    that still simulate green.
+  - Front end re-biased to the LTC2165's 0.9 V VCM output; residual DC
+    offset lands in FFT bins 0–1, below the 100 kHz science band — no
+    RTL impact, but expect a bin-0 spike in raw spectra.
+  - Passband is flat 230 Hz–17.5 MHz (~72 dB gain, ~300 mW, single 5 V);
+    bins above 17.5 MHz see the filter roll-off — ground-calibration
+    fact, not an RTL one.
+  - Gain rebalance pending: LTC2165 LSB ≈ 30 µV (2 Vpp / 16 bit) vs
+    ~200 µV on the LPC4370, so some of the 72 dB analog gain can likely
+    be shed. Bin widths to quote for SNR sizing: ~39 kHz (1024-pt) /
+    ~78 kHz (512-pt) at 40 Msps, 4 frames averaged per spectrum.
 - Payload-computer interface: I2C/UART slave, framed packets with
   ACK/NACK + heartbeat (replaces the flight 1-byte command).
 - Storage module (SD/SPI or external flash, raw 512-B block writes).
