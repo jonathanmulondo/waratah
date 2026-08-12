@@ -14,3 +14,16 @@ fpga/libero/
 
 # MS Office lock files
 ~$*
+
+# Machine-tied license file (Libero SoC, DiskID-locked) -- credential-like, not source
+License.dat
+
+# Host-side test build artifacts
+mcu/test/*.exe
+mcu/test/test_debris
+mcu/test/test_framed
+mcu/test/test_qtn
+
+# Generated Libero project output (regenerate via fpga/libero_scripts/*.tcl)
+fpga/libero_scripts/*/
+fpga/libero_scripts/*.log
