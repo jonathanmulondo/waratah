@@ -160,6 +160,15 @@ function), replacing the LPC4370 firmware's monolithic mode loop:
   (numpy). Run sims from `fpga/sim` with `sh run_all.sh` (Questa `vlog`/`vsim -c` are on
   PATH from the Quartus 25.1 install at C:\altera_lite). Jonathan also runs tests in
   Quartus himself — keep RTL vendor-neutral Verilog-2001, no vendor primitives.
+  v0.2 (2026-07-10) added burst_ctrl, cic_decim, payload_if (framed link) + uart, and
+  eddi_top, each with a testbench in `fpga/tb/` that `run_all.sh` runs.
+- **`mcu/`** — EDDI-MCU v0.1 (2026-08, see `mcu/README.md`): C port of the debris, framed
+  protocol and QTN algorithms for a dual-core **STM32H745/755** (M7 QTN/FFT, M4 debris),
+  from the pivot away from the PolarFire FPGA target (reasons in the commit message of
+  `6784276`: native industrial temperature grade, still two cores running the two
+  science paths in parallel). `mcu/src/common/` is hardware-independent; run the host
+  tests with `cd mcu/test && make test` (gcc, x86; not an embedded build). Not written
+  yet: CMSIS-DSP FFT backend, HAL/board bring-up, inter-core comms.
 
 ## Working Conventions
 
