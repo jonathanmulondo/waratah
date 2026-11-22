@@ -14,7 +14,7 @@ tb/    self-checking testbenches (print TB_PASS / TB_FAIL)
 sim/   gen_vectors.py (numpy golden vectors + ROM init), run script, mem/
 ```
 
-## Modules (v0.1)
+## Modules (v0.2)
 
 | Module              | Function | Status |
 |---------------------|----------|--------|
@@ -23,6 +23,11 @@ sim/   gen_vectors.py (numpy golden vectors + ROM init), run script, mem/
 | `qtn_core.v`        | **Ionosphere module**: Hann window → FFT → averaged PSD (flight QTN mode) | tested |
 | `debris_detector.v` | **Debris module**: 2-phase calibration, 4σ + crossing-rate trigger, 512-pre/1024-post capture (flight debris mode) | tested |
 | `watchdog.v`        | Timeout reset with sticky fired count (gap flagged in the thesis) | tested |
+| `burst_ctrl.v`      | QTN burst/cadence controller: amp power-gating, settle, one spectrum per collection (v0.2) | tested (`tb_burst`) |
+| `cic_decim.v`       | 3-stage CIC decimator, 800:1 (40 Msps → 50 ksps) for the debris path off a shared ADC (v0.2) | tested (`tb_cic`) |
+| `payload_if.v`      | Framed command/telemetry link (SOF/CMD/LEN/payload/CRC-8, ACK/NACK, heartbeat) over UART (v0.2) | tested (`tb_payload`) |
+| `uart.v`            | 8N1 `uart_rx` + `uart_tx` used by `payload_if` (v0.2) | via `tb_payload` / `tb_top` |
+| `eddi_top.v`        | Top level: QTN and debris paths concurrent off one ADC bus, payload link, watchdog (v0.2) | tested (`tb_top`) |
 
 ## Running the simulations (Questa CLI)
 
@@ -83,7 +88,7 @@ hardware would read zeros while sims stay green.
   sum-of-squares RAM.
 - Runtime-selectable 512/1024 FFT (currently a synthesis parameter).
 - ADC interface module: LVDS DDR deserialiser for LTC2165/ADS5560;
-  decimation tap for the debris path if a single shared ADC is chosen.
+  (The debris-path decimation tap is done: `cic_decim.v`, v0.2.)
   Constraints from the analog front-end design (LMH6629 chain, QTN path,
   per its designer 2026-07-10):
   - **Effective sample rate locked at 40 Msps.** The chain's anti-alias
@@ -104,9 +109,9 @@ hardware would read zeros while sims stay green.
     ~200 µV on the LPC4370, so some of the 72 dB analog gain can likely
     be shed. Bin widths to quote for SNR sizing: ~39 kHz (1024-pt) /
     ~78 kHz (512-pt) at 40 Msps, 4 frames averaged per spectrum.
-- Payload-computer interface: I2C/UART slave, framed packets with
-  ACK/NACK + heartbeat (replaces the flight 1-byte command).
+- Payload-computer interface: the UART framed link with ACK/NACK +
+  heartbeat is done (`payload_if.v`, v0.2); an I2C transport, if the bus
+  needs one, is not.
 - Storage module (SD/SPI or external flash, raw 512-B block writes).
-- Top-level `eddi_top.v` wiring QTN + debris concurrently + watchdog,
-  then Libero synthesis trial on the MPF300T (math-block/LSRAM mapping,
-  timing closure at target clock).
+- Libero synthesis trial of `eddi_top.v` (done in sim, v0.2) on the
+  MPF300T (math-block/LSRAM mapping, timing closure at target clock).
